@@ -1,35 +1,142 @@
-import './App.css';
+import { useState, useEffect } from "react";
+import { Redirect, Switch, Route } from "react-router-dom";
+import SignIn from "./SignIn";
+import SignUp from "./SignUp";
+import ChatRoom from "./ChatRoom";
+import MoreInformation from "./MoreInformation";
+import LoadingComponent from "./LoadingComponent";
+import useAsync from "./hooks/useAsync";
+import { auth, database } from "./firebase";
 
-import { Route, Redirect, Switch } from "react-router-dom";
+const style = {
+  height: "100vh",
+  width: "100%",
+};
 
-import firebase from 'firebase/app';
-import 'firebase/firestore';
-import 'firebase/auth';
+export default function App() {
+  const [authenticated, setAuthenticated] = useState(false);
+  const [authenticatedAndFilled, setAuthenticatedAndFilled] = useState(false);
+  const [userFirebaseData, setUserFirebaseData] = useState({});
+  const { isLoading, run } = useAsync();
 
-import SignIn from './SignIn'
-import {useAuthState} from 'react-firebase-hooks/auth';
-import {useCollectionData} from 'react-firebase-hooks/firestore';
+  const handleChangeAuthAndFilled = (value) => {
+    setAuthenticatedAndFilled(value);
+  };
 
-firebase.initializeApp({
-  apiKey: "AIzaSyAXxuq6xTemrSpZ9Q1_EHlOA1Axf4joUSo",
-  authDomain: "chat-application-37557.firebaseapp.com",
-  projectId: "chat-application-37557",
-  storageBucket: "chat-application-37557.appspot.com",
-  messagingSenderId: "448401421505",
-  appId: "1:448401421505:web:e2d9d9826b35dd1c365040"
-})
-const auth = firebase.auth();
-const firestore = firebase.firestore();
-
-function App() {
+  useEffect(() => {
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        console.log("user log in");
+        database.ref(".info/connected").on("value", (snap) => {
+          if (snap.val() === true) {
+            database.ref("/users/" + user.uid).update({ status: "Online" });
+          }
+        });
+        await database
+          .ref("users/" + user.uid)
+          .onDisconnect()
+          .update({
+            status: "Offline",
+            inConversation: false,
+            beingCalled: "no",
+          });
+        run(
+          database
+            .ref("users/" + user.uid)
+            .get()
+            .then((snapshot) => {
+              if (Object.keys(snapshot.val()).length <= 1) {
+                setAuthenticated(true);
+              } else {
+                setAuthenticatedAndFilled(true);
+              }
+            })
+        );
+        setUserFirebaseData(user);
+      } else {
+        console.log("user log out");
+        if (userFirebaseData.uid) {
+          database.ref("users/" + userFirebaseData.uid).update({
+            status: "Offline",
+            inConversation: false,
+            beingCalled: "no",
+          });
+        }
+        setAuthenticated(false);
+        setAuthenticatedAndFilled(false);
+        //refactor this to avoid garbage data
+        setUserFirebaseData({});
+      }
+    });
+  }, [run, userFirebaseData.uid]);
 
   return (
-    <Switch>
-        <Redirect exact from="/" to="/login" />
-        <Route path="/login" component={SignIn} />
-        {/* <Route path="/chat" component={} /> */}
+    <div className="App" style={style}>
+      <Switch>
+        <Redirect exact from="/" to="/signin" />
+        <Route
+          path="/signin"
+          render={() => {
+            if (isLoading) return <LoadingComponent />;
+            if (authenticated) {
+              return <Redirect to="/moreInformation" />;
+            } else if (authenticatedAndFilled) {
+              return <Redirect to="/chatRoom" />;
+            } else {
+              return <SignIn />;
+            }
+          }}
+        />
+        <Route
+          path="/signup"
+          render={() => {
+            if (isLoading) return <LoadingComponent />;
+            if (authenticatedAndFilled) {
+              return <Redirect to="/chatRoom" />;
+            } else {
+              return (
+                <SignUp handleChangeAuthAndFilled={handleChangeAuthAndFilled} />
+              );
+            }
+          }}
+        />
+        <Route
+          path="/moreInformation"
+          render={() => {
+            if (isLoading) return <LoadingComponent />;
+            if (authenticatedAndFilled) {
+              return <Redirect to="/chatRoom" />;
+            } else if (authenticated) {
+              return (
+                <MoreInformation
+                  handleChangeAuthAndFilled={handleChangeAuthAndFilled}
+                  user={userFirebaseData}
+                />
+              );
+            } else {
+              return <Redirect to="/" />;
+            }
+          }}
+        />
+        <Route
+          path="/chatRoom"
+          render={() => {
+            if (isLoading) return <LoadingComponent />;
+            if (authenticatedAndFilled) {
+              return (
+                <ChatRoom
+                  handleChangeAuthAndFilled={handleChangeAuthAndFilled}
+                  user={userFirebaseData}
+                />
+              );
+            } else if (authenticated) {
+              return <Redirect to="/moreInformation" />;
+            } else {
+              return <Redirect to="/" />;
+            }
+          }}
+        />
       </Switch>
+    </div>
   );
 }
-
-export default App;
