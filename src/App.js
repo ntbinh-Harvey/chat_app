@@ -1,24 +1,34 @@
-import logo from './logo.svg';
 import './App.css';
 
+import { Route, Redirect, Switch } from "react-router-dom";
+
+import firebase from 'firebase/app';
+import 'firebase/firestore';
+import 'firebase/auth';
+
+import SignIn from './SignIn'
+import {useAuthState} from 'react-firebase-hooks/auth';
+import {useCollectionData} from 'react-firebase-hooks/firestore';
+
+firebase.initializeApp({
+  apiKey: "AIzaSyAXxuq6xTemrSpZ9Q1_EHlOA1Axf4joUSo",
+  authDomain: "chat-application-37557.firebaseapp.com",
+  projectId: "chat-application-37557",
+  storageBucket: "chat-application-37557.appspot.com",
+  messagingSenderId: "448401421505",
+  appId: "1:448401421505:web:e2d9d9826b35dd1c365040"
+})
+const auth = firebase.auth();
+const firestore = firebase.firestore();
+
 function App() {
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Switch>
+        <Redirect exact from="/" to="/login" />
+        <Route path="/login" component={SignIn} />
+        {/* <Route path="/chat" component={} /> */}
+      </Switch>
   );
 }
 
